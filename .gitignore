@@ -67,3 +67,12 @@ app.*.map.json
 # Generated files
 **/*.g.dart
 **/*.freezed.dart
+
+# Firebase
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+
+# Generated files
+*.g.dart
+*.freezed.dart
