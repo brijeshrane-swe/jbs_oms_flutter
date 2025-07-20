@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:order_management_system/core/router/route_provider.dart';
 
 class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // final router = ref.watch(routerProvider);
+    final router = ref.watch(routerProvider);
     // final themeMode = ref.watch(themeModeProvider);
     // final fontScale = ref.watch(fontScaleProvider);
 
@@ -26,9 +27,9 @@ class MyApp extends ConsumerWidget {
       //   ),
       // ),
       // themeMode: themeMode,
-      //
-      // // Router configuration
-      // routerConfig: router,
+
+      // Router configuration
+      routerConfig: router,
 
       // Responsive design
       builder: (context, child) {
