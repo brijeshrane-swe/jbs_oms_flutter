@@ -1,38 +1,25 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:order_management_system/presentation/providers/theme_provider.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:order_management_system/app.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables
+  await dotenv.load(fileName: "..env");
+
+  // Initialize Firebase
+  await Firebase.initializeApp();
+
+  // Initialize services
+  // await FirebaseService.initialize();
+  // await NotificationService.initialize();
+
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
+    const ProviderScope(
       child: MyApp(),
     ),
   );
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final tp = context.watch<ThemeProvider>();
-    return MaterialApp(
-      title: 'JBS OMS',
-      theme: ThemeData.light(),
-      darkTheme: ThemeData.dark(),
-      themeMode: tp.themeMode,
-      home: Scaffold(
-        appBar: AppBar(
-          title: Text('JBS OMS'),
-        ),
-        body: SwitchListTile(
-          title: const Text('Dark mode'),
-          value: context.watch<ThemeProvider>().isDarkMode,
-          onChanged: (v) => context.read<ThemeProvider>().toggleTheme(v),
-        ),
-      ),
-    );
-  }
 }
