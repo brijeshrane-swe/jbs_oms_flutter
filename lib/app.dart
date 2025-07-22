@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:order_management_system/core/router/route_provider.dart';
+import 'package:order_management_system/core/theme/app_theme.dart';
+import 'package:order_management_system/core/theme/font_scale_provider.dart';
+import 'package:order_management_system/core/theme/theme_provider.dart';
 
 class MyApp extends ConsumerWidget {
   const MyApp({super.key});
@@ -8,35 +11,24 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
-    // final themeMode = ref.watch(themeModeProvider);
-    // final fontScale = ref.watch(fontScaleProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    final fontScale = ref.watch(fontScaleProvider);
 
     return MaterialApp.router(
       title: 'Mom\'s Product Order Management',
       debugShowCheckedModeBanner: false,
-
-      // Theme configuration
-      // theme: AppTheme.lightTheme.copyWith(
-      //   textTheme: AppTheme.lightTheme.textTheme.apply(
-      //     fontSizeFactor: fontScale,
-      //   ),
-      // ),
-      // darkTheme: AppTheme.darkTheme.copyWith(
-      //   textTheme: AppTheme.darkTheme.textTheme.apply(
-      //     fontSizeFactor: fontScale,
-      //   ),
-      // ),
-      // themeMode: themeMode,
-
-      // Router configuration
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
       routerConfig: router,
-
-      // Responsive design
       builder: (context, child) {
+        final scaler = TextScaler.linear(fontScale);
+
         return MediaQuery(
+          // Override the MediaQuery data to apply the custom text scaler.
           data: MediaQuery.of(context).copyWith(
-              // textScaler: TextScaler.linear(fontScale),
-              ),
+            textScaler: scaler,
+          ),
           child: child ?? const SizedBox.shrink(),
         );
       },
