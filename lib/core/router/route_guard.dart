@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../features/auth/domain/entities/user_entity.dart';
 import '../constants/route_constants.dart';
 
 /// Handles authentication and role-based route protection
@@ -10,12 +11,9 @@ class RouteGuard {
     required GoRouterState state,
     required dynamic authState,
   }) {
-    // Use state.uri.toString() instead of deprecated state.location
     final currentLocation = state.uri.toString();
-
-    // Check if user is authenticated
     final isAuthenticated = authState.user != null;
-    final userRole = authState.user?.role;
+    final user = authState.user as UserEntity?;
 
     // Public routes that don't require authentication
     final publicRoutes = [
@@ -30,57 +28,70 @@ class RouteGuard {
 
     // If authenticated and on login page, redirect to appropriate dashboard
     if (isAuthenticated && currentLocation == AppRoutes.login) {
-      return _getInitialRouteForRole(userRole);
+      return _getInitialRouteForUser(user);
     }
 
     // Role-based access control
-    if (isAuthenticated) {
-      return _checkRoleBasedAccess(currentLocation, userRole);
+    if (isAuthenticated && user != null) {
+      return _checkUserAccess(currentLocation, user);
     }
 
     return null; // No redirect needed
   }
 
-  /// Get initial route based on user role
-  static String _getInitialRouteForRole(String? role) {
-    switch (role?.toLowerCase()) {
-      case 'admin':
+  /// Get initial route based on user role and verification status
+  static String _getInitialRouteForUser(UserEntity? user) {
+    if (user == null) return AppRoutes.login;
+
+    switch (user.role) {
+      case UserRole.admin:
         return AppRoutes.adminDashboard;
-      case 'client':
-        return AppRoutes.products; // Start clients at products page
-      default:
-        return AppRoutes.login;
+      case UserRole.client:
+        if (user.isVerified) {
+          return AppRoutes.products;
+        } else {
+          return AppRoutes.clientVerification;
+        }
+      case UserRole.user:
+        return AppRoutes.clientVerification;
     }
   }
 
-  /// Check if user has access to specific route based on role
-  static String? _checkRoleBasedAccess(String currentLocation, String? role) {
-    // Admin routes - only admins can access
-    final adminRoutes = [
-      AppRoutes.adminDashboard, // Catch all admin routes
-    ];
+  /// Check if user has access to specific route based on role and verification
+  static String? _checkUserAccess(String currentLocation, UserEntity user) {
+    // Admin routes
+    final adminRoutes = ['/admin'];
 
-    // Client routes - only clients can access
-    final clientRoutes = [
-      AppRoutes.products,
-      AppRoutes.orders,
-      AppRoutes.notifications,
-      AppRoutes.profile,
-      AppRoutes.clientDashboard, // Catch all client routes
-    ];
+    // Client routes (require verified client)
+    final clientRoutes = ['/client'];
 
-    // Check admin access
+    // Verification routes
+    final verificationRoutes = [AppRoutes.clientVerification];
+
+    // Admin access
     if (adminRoutes.any((route) => currentLocation.startsWith(route))) {
-      if (role?.toLowerCase() != 'admin') {
-        return AppRoutes.products; // Redirect non-admin to client area
+      if (user.role != UserRole.admin) {
+        return _getInitialRouteForUser(user);
       }
     }
 
-    // Check client access
+    // Client access (verified clients only)
     if (clientRoutes.any((route) => currentLocation.startsWith(route))) {
-      if (role?.toLowerCase() != 'client') {
-        return AppRoutes.adminDashboard; // Redirect non-client to admin area
+      if (user.role == UserRole.admin) {
+        return AppRoutes.adminDashboard;
+      } else if (user.role != UserRole.client || !user.isVerified) {
+        return AppRoutes.clientVerification;
       }
+    }
+
+    // Verification route access
+    if (verificationRoutes.any((route) => currentLocation.startsWith(route))) {
+      if (user.role == UserRole.admin) {
+        return AppRoutes.adminDashboard;
+      } else if (user.role == UserRole.client && user.isVerified) {
+        return AppRoutes.products;
+      }
+      // Unverified users (role: user or unverified client) stay on verification
     }
 
     return null; // Access allowed

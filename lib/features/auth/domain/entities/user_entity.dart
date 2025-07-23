@@ -1,4 +1,4 @@
-enum UserRole { admin, client }
+enum UserRole { admin, user, client }
 
 class UserEntity {
   final String id;

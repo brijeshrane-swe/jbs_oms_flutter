@@ -5,12 +5,14 @@ class AuthState {
   final bool isLoading;
   final String? error;
   final bool isAuthenticated;
+  final bool isGoogleSignInInitialized;
 
   const AuthState({
     this.user,
     this.isLoading = false,
     this.error,
     this.isAuthenticated = false,
+    this.isGoogleSignInInitialized = false,
   });
 
   AuthState copyWith({
@@ -18,12 +20,15 @@ class AuthState {
     bool? isLoading,
     String? error,
     bool? isAuthenticated,
+    bool? isGoogleSignInInitialized,
   }) {
     return AuthState(
       user: user ?? this.user,
       isLoading: isLoading ?? this.isLoading,
       error: error ?? this.error,
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
+      isGoogleSignInInitialized:
+          isGoogleSignInInitialized ?? this.isGoogleSignInInitialized,
     );
   }
 
@@ -39,6 +44,7 @@ class AuthState {
         isLoading: false,
         error: null,
         isAuthenticated: true,
+        isGoogleSignInInitialized: isGoogleSignInInitialized,
       );
 
   // Error state
@@ -48,6 +54,9 @@ class AuthState {
         isAuthenticated: false,
         user: null,
       );
+
+  // Add method to mark initialization complete
+  AuthState initialized() => copyWith(isGoogleSignInInitialized: true);
 
   // Unauthenticated state
   static const AuthState unauthenticated = AuthState(

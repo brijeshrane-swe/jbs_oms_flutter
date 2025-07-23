@@ -1,0 +1,22 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "jbs-crm-app",
+          "appId": "1:719977785219:android:455356147288fe2008f8b6",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "jbs-crm-app",
+          "configurations": {
+            "android": "1:719977785219:android:455356147288fe2008f8b6",
+            "web": "1:719977785219:web:5972fe33eedfbe6e08f8b6"
+          }
+        }
+      }
+    }
+  }
+}
