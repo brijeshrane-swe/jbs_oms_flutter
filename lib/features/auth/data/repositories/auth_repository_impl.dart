@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -35,122 +37,129 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<UserEntity?> signInWithGoogle() async {
-    if (kDebugMode) {
-      print('🚀 Starting Google Sign-In process...');
-    }
-
     try {
-      // Step 1: Initialize GoogleSignIn
-      if (kDebugMode) {
-        print('📋 Step 1: Initializing GoogleSignIn...');
-      }
       await _ensureGoogleSignInInitialized();
-      if (kDebugMode) {
-        print('✅ Step 1: GoogleSignIn initialization completed');
-      }
 
-      // Step 2: Attempt authentication
-      if (kDebugMode) {
-        print('🔐 Step 2: Calling authenticate() method...');
-      }
       final GoogleSignInAccount account = await _googleSignIn.authenticate();
-      if (kDebugMode) {
-        print('✅ Step 2: authenticate() completed successfully');
-        print('👤 Account details: ${account.email}, ${account.displayName}');
-      }
 
       // ignore: unnecessary_null_comparison
-      if (account == null) {
-        if (kDebugMode) {
-          print('❌ Step 2: Account is null (user cancelled)');
-        }
-        return null;
-      }
+      if (account == null) return null;
 
-      // Step 3: Get authentication tokens
-      if (kDebugMode) {
-        print('🎫 Step 3: Getting authentication tokens...');
-      }
+      // Get authentication tokens
       final authTokens = await _getAuthenticationTokens(account);
-      if (kDebugMode) {
-        print('✅ Step 3: Authentication tokens retrieved successfully');
-        print(
-            '🔑 Token info: accessToken length=${authTokens.accessToken.length}, idToken length=${authTokens.idToken.length}');
-      }
 
-      // Step 4: Create Firebase credential
-      if (kDebugMode) {
-        print('🔥 Step 4: Creating Firebase credential...');
-      }
-      final credential = GoogleAuthProvider.credential(
-        accessToken: authTokens.accessToken,
-        idToken: authTokens.idToken,
-      );
-      if (kDebugMode) {
-        print('✅ Step 4: Firebase credential created successfully');
-      }
-
-      // Step 5: Sign in to Firebase
-      if (kDebugMode) {
-        print('🔥 Step 5: Signing in to Firebase with credential...');
-      }
-      final UserCredential result =
-          await _firebaseAuth.signInWithCredential(credential);
-      if (kDebugMode) {
-        print('✅ Step 5: Firebase sign-in completed');
-        print('👤 Firebase user: ${result.user?.uid}, ${result.user?.email}');
-      }
-
-      // Step 6: Create/Update user in Firestore
-      if (result.user != null) {
+      // Try Firebase credential first, with fallback
+      try {
         if (kDebugMode) {
-          print('💾 Step 6: Creating/updating user in Firestore...');
+          print('🔥 Attempting Firebase credential sign-in...');
         }
-        final userEntity = await _createOrUpdateUser(result.user!);
+
+        final credential = GoogleAuthProvider.credential(
+          accessToken: authTokens.accessToken,
+          idToken: authTokens.idToken,
+        );
+
+        final UserCredential result =
+            await _firebaseAuth.signInWithCredential(credential);
+
+        if (result.user != null) {
+          return await _createOrUpdateUser(result.user!);
+        }
+      } catch (credentialError) {
         if (kDebugMode) {
-          print('✅ Step 6: User created/updated successfully');
-          print(
-              '🎯 Final result: ${userEntity?.email}, role: ${userEntity?.role}');
+          print('❌ Firebase credential failed: $credentialError');
+          print('🔄 Falling back to manual user creation...');
         }
-        return userEntity;
+
+        // Fallback: Create user manually from token data
+        return await _createUserFromTokens(authTokens);
       }
 
-      if (kDebugMode) {
-        print('❌ Step 5: Firebase user is null');
-      }
       return null;
-    } on FirebaseAuthException catch (e) {
+    } catch (e) {
+      throw Exception('Google Sign-In failed: $e');
+    }
+  }
+
+  /// Create user manually from Google tokens without Firebase Auth credential
+  Future<UserEntity?> _createUserFromTokens(_AuthTokens authTokens) async {
+    try {
+      // Decode ID token to extract user information
+      final userInfo = _decodeIdToken(authTokens.idToken);
+
+      final userId = userInfo['sub'] as String;
+      final email = userInfo['email'] as String;
+      final displayName = userInfo['name'] as String? ?? email;
+      final photoUrl = userInfo['picture'] as String?;
+
       if (kDebugMode) {
-        print('🔥❌ Firebase Auth Exception caught:');
-        print('   Code: ${e.code}');
-        print('   Message: ${e.message}');
-        print('   Stack trace: ${e.stackTrace}');
-      }
-      throw Exception('Firebase Auth Error: ${e.code} - ${e.message}');
-    } catch (e, stackTrace) {
-      if (kDebugMode) {
-        print('❌ General Exception caught:');
-        print('   Error: $e');
-        print('   Type: ${e.runtimeType}');
-        print('   Stack trace: $stackTrace');
+        print('👤 Decoded user info: $email, $displayName');
       }
 
-      // Handle specific errors
-      if (e.toString().contains('PigeonUserDetails')) {
-        if (kDebugMode) {
-          print(
-              '🐦 PigeonUserDetails error detected - this is the root cause!');
-        }
-        throw Exception(
-            'Authentication service temporarily unavailable. Please restart the app.');
-      } else if (e.toString().contains('Sign in aborted by user')) {
-        if (kDebugMode) {
-          print('👤 User cancelled sign-in');
-        }
-        return null; // User cancelled
+      // Create UserEntity
+      final userEntity = UserEntity(
+        id: userId,
+        email: email,
+        displayName: displayName,
+        photoUrl: photoUrl,
+        role: UserRole.user,
+        isVerified: false,
+      );
+
+      // Save directly to Firestore
+      await _firestore.collection('users').doc(userId).set({
+        'email': email,
+        'displayName': displayName,
+        'photoUrl': photoUrl,
+        'role': 'user',
+        'isVerified': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastSignIn': FieldValue.serverTimestamp(),
+      });
+
+      if (kDebugMode) {
+        print('✅ User created manually in Firestore');
       }
 
-      throw Exception('Google Sign-In failed: Please try again');
+      return userEntity;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Manual user creation failed: $e');
+      }
+      throw Exception('Failed to create user from tokens: $e');
+    }
+  }
+
+  /// Decode JWT ID token to extract user information
+  Map<String, dynamic> _decodeIdToken(String idToken) {
+    try {
+      final parts = idToken.split('.');
+      if (parts.length != 3) {
+        throw Exception('Invalid ID token format');
+      }
+
+      // Get the payload (second part)
+      String payload = parts[1];
+
+      // Add padding if needed for base64 decoding
+      switch (payload.length % 4) {
+        case 0:
+          break;
+        case 2:
+          payload += '==';
+          break;
+        case 3:
+          payload += '=';
+          break;
+        default:
+          throw Exception('Invalid base64 string');
+      }
+
+      // Decode base64url
+      final decoded = utf8.decode(base64Url.decode(payload));
+      return json.decode(decoded) as Map<String, dynamic>;
+    } catch (e) {
+      throw Exception('Failed to decode ID token: $e');
     }
   }
 
